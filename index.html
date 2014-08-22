@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<title>Trees</title>
+<style>
+
+body {
+  /*font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;*/
+  font: 11px sans-serif;
+  position: relative;
+  height: 800px;
+}
+
+.xaxis path,
+.xaxis line {
+  stroke-width: 1px;
+  fill: none;
+  stroke: #000;
+  shape-rendering: crispEdges;
+}
+
+</style>
+<body>
+  
+</body>
+<script src="d3.v3.min.js"></script>
+<script>
+
+var width = document.body.clientWidth;
+    height = document.body.clientHeight;
+    halfpi = Math.PI * -0.5;
+
+var svg = d3.select("body").append("svg")
+    .attr("width", width)
+    .attr("height", height);
+
+
+function Branch(id) {
+  this.startx = 0;
+  this.starty = 0;
+  this.endx = 0;
+  this.endy = 0;
+  this.angle = Math.PI * 0.0;
+  this.length = 20;
+
+  this.id = id;
+  this.g = null;
+  this.parent = null;
+  this.has_children = false;
+
+
+  // update start and end
+  this.update = function() {
+    // move this to the end of it's parent
+    // root doens't get anything
+    if(this.parent != null) {
+      this.startx = this.parent.endx;
+      this.starty = this.parent.endy;
+    }
+    // calc this end
+    this.endx = this.startx + Math.cos(halfpi + this.angle) * this.length;
+    this.endy = this.starty + Math.sin(halfpi + this.angle) * this.length;
+  };
+
+  // all the drawing code is here is either svg or canvas
+  // create the svg element
+  this.create = function() {
+    this.g = svg.append("g")
+        .attr("class", "branch")
+        .attr("id", "br" + this.id);
+
+    this.g.append("circle")
+        .attr('cx', this.startx)
+        .attr('cy', this.starty)
+        .attr('r', 2);
+
+    this.g.append("line")
+        .attr('x1', this.startx)
+        .attr('y1', this.starty)
+        .attr('x2', this.endx)
+        .attr('y2', this.endy)
+        .attr('stroke', 'black')
+        .attr('stroke-width', '1');
+  };
+
+  // update svg with current
+  this.draw = function() {
+    svg.select('#br' + this.id + ' path')
+        .attr('cx', this.startx)
+        .attr('cy', this.starty);
+
+    svg.select('#br' + this.id + ' line')
+        .attr('x1', this.startx)
+        .attr('y1', this.starty)
+        .attr('x2', this.endx)
+        .attr('y2', this.endy);
+
+  }
+}
+
+function Tree() {
+    this.branches = [];
+    this.extend_ratio = 0.05;
+    this.split_ratio = 0.05;
+    this.angle_variance = 0.2;
+    this.branch_split = 0.3;
+
+    // create root branch
+    var b = new Branch(0);
+    b.startx = width * 0.5;
+    b.starty = height;
+    b.update();
+    b.create();
+    this.branches.push(b);
+
+    this.getInfo = function() {
+      return this.branches;
+    };
+
+    this.run = function() {
+      console.log('update');
+      // keep new branches seperate until end
+      var newbranches = [];
+      
+      for(var i=0;i < this.branches.length;i++) {
+        // update branches
+        var b = this.branches[i];
+        b.update();
+        b.draw();
+
+        // only grow from ends of branches
+        if(!b.has_children && newbranches.length < 1) {
+          var r = Math.random();
+          
+          // extend branch
+          if(r < this.extend_ratio) {
+            // console.log('extend');
+            var nb = new Branch(this.branches.length + newbranches.length);
+            nb.startx = b.endx;
+            nb.starty = b.endy;
+            nb.angle = b.angle + 
+                (Math.random() * this.angle_variance) - (this.angle_variance / 2);
+
+            nb.update();
+            nb.create();
+            newbranches.push(nb);
+
+            b.has_children = true;
+          }
+
+          // split branches
+          if(r > this.extend_ratio && r < this.extend_ratio + this.split_ratio) {
+            // console.log('split');
+            // console.log(b);
+            var nb1 = new Branch(this.branches.length + newbranches.length);
+
+            nb1.startx = b.endx;
+            nb1.starty = b.endy;
+            nb1.angle = b.angle + this.branch_split + 
+                (Math.random() * this.angle_variance) - (this.angle_variance / 2);
+            nb1.update();
+            nb1.create();
+            newbranches.push(nb1);
+            
+            
+            var nb2 = new Branch(this.branches.length + newbranches.length);
+            nb2.startx = b.endx;
+            nb2.starty = b.endy;
+            nb2.angle = b.angle - this.branch_split + 
+                (Math.random() * this.angle_variance) - (this.angle_variance / 2);
+            nb2.update();
+            nb2.create();
+            newbranches.push(nb2);
+
+            b.has_children = true;
+          }
+          
+        }
+      }
+
+      // add in new branches
+      for(var i=0;i < newbranches.length;i++) {
+        this.branches.push(newbranches[i]);
+      }
+    }
+}
+
+var tree = new Tree();
+
+console.log(tree);
+
+
+// run this every interval
+window.setInterval(function(){
+  tree.run();
+}, 100);
+
+</script>
