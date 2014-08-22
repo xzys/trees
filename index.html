@@ -10,14 +10,6 @@ body {
   height: 800px;
 }
 
-.xaxis path,
-.xaxis line {
-  stroke-width: 1px;
-  fill: none;
-  stroke: #000;
-  shape-rendering: crispEdges;
-}
-
 </style>
 <body>
   
@@ -40,7 +32,9 @@ function Branch(id) {
   this.endx = 0;
   this.endy = 0;
   this.angle = Math.PI * 0.0;
-  this.length = 20;
+  this.length = 0;
+  this.tlength = 0;// target length
+  this.thickness = 1;
 
   this.id = id;
   this.g = null;
@@ -56,6 +50,11 @@ function Branch(id) {
       this.startx = this.parent.endx;
       this.starty = this.parent.endy;
     }
+
+    if(this.tlength - this.length > 1) {
+      this.length += (this.tlength - this.length) * tree.branch_grow;
+    }
+
     // calc this end
     this.endx = this.startx + Math.cos(halfpi + this.angle) * this.length;
     this.endy = this.starty + Math.sin(halfpi + this.angle) * this.length;
@@ -68,10 +67,10 @@ function Branch(id) {
         .attr("class", "branch")
         .attr("id", "br" + this.id);
 
-    this.g.append("circle")
-        .attr('cx', this.startx)
-        .attr('cy', this.starty)
-        .attr('r', 2);
+    // this.g.append("circle")
+    //     .attr('cx', this.startx)
+    //     .attr('cy', this.starty)
+    //     .attr('r', 2);
 
     this.g.append("line")
         .attr('x1', this.startx)
@@ -84,9 +83,9 @@ function Branch(id) {
 
   // update svg with current
   this.draw = function() {
-    svg.select('#br' + this.id + ' path')
-        .attr('cx', this.startx)
-        .attr('cy', this.starty);
+    // svg.select('#br' + this.id + ' path')
+    //     .attr('cx', this.startx)
+    //     .attr('cy', this.starty);
 
     svg.select('#br' + this.id + ' line')
         .attr('x1', this.startx)
@@ -99,15 +98,22 @@ function Branch(id) {
 
 function Tree() {
     this.branches = [];
+    // this.extend_ratio = 0;
+    // this.split_ratio = 1;
+    
     this.extend_ratio = 0.05;
-    this.split_ratio = 0.05;
-    this.angle_variance = 0.2;
+    this.split_ratio = 0.02;
+    this.angle_variance = 0.3;
     this.branch_split = 0.3;
+    this.branch_grow = 0.2;
+
+    this.blength_base = 20;
+    this.blength_variance = 5;
 
     // create root branch
     var b = new Branch(0);
     b.startx = width * 0.5;
-    b.starty = height;
+    b.starty = height * 0.9;
     b.update();
     b.create();
     this.branches.push(b);
@@ -127,6 +133,11 @@ function Tree() {
         b.update();
         b.draw();
 
+        // calculate thickness from the tips
+        if(!b.has_children) {
+          this.caclulate_thickness(b);
+        }
+
         // only grow from ends of branches
         if(!b.has_children && newbranches.length < 1) {
           var r = Math.random();
@@ -137,8 +148,13 @@ function Tree() {
             var nb = new Branch(this.branches.length + newbranches.length);
             nb.startx = b.endx;
             nb.starty = b.endy;
-            nb.angle = b.angle + 
-                (Math.random() * this.angle_variance) - (this.angle_variance / 2);
+            // bad style but shows similarity clearly
+            nb.angle = b.angle 
+                + (Math.random() * this.angle_variance)
+                - (this.angle_variance / 2);
+            nb.tlength = this.blength_base
+                + (Math.random() * this.blength_variance)
+                - (this.blength_variance / 2);
 
             nb.update();
             nb.create();
@@ -148,7 +164,8 @@ function Tree() {
           }
 
           // split branches
-          if(r > this.extend_ratio && r < this.extend_ratio + this.split_ratio) {
+          if(r > this.extend_ratio && r < this.extend_ratio + this.split_ratio &&
+             this.branches.length > 2) {
             // console.log('split');
             // console.log(b);
             var nb1 = new Branch(this.branches.length + newbranches.length);
@@ -157,16 +174,20 @@ function Tree() {
             nb1.starty = b.endy;
             nb1.angle = b.angle + this.branch_split + 
                 (Math.random() * this.angle_variance) - (this.angle_variance / 2);
+            nb1.tlength = this.blength_base + 
+                (Math.random() * this.blength_variance) - (this.blength_variance / 2);
             nb1.update();
             nb1.create();
             newbranches.push(nb1);
             
-            
+            // gotta make sure newbranches.length is updated
             var nb2 = new Branch(this.branches.length + newbranches.length);
             nb2.startx = b.endx;
             nb2.starty = b.endy;
             nb2.angle = b.angle - this.branch_split + 
                 (Math.random() * this.angle_variance) - (this.angle_variance / 2);
+            nb2.tlength = this.blength_base + 
+                (Math.random() * this.blength_variance) - (this.blength_variance / 2);
             nb2.update();
             nb2.create();
             newbranches.push(nb2);
@@ -181,6 +202,12 @@ function Tree() {
       for(var i=0;i < newbranches.length;i++) {
         this.branches.push(newbranches[i]);
       }
+    };
+
+    // starts from the tips and recursive grows downward
+    this.caclulate_thickness = function(cur) {
+      var cb = cur.parent;
+
     }
 }
 
@@ -193,5 +220,25 @@ console.log(tree);
 window.setInterval(function(){
   tree.run();
 }, 100);
+
+
+// //set thcknesses from tips
+//     //count number of parents
+//     if (!children && !(this instanceof Leaf) &&  parent.parent != null) {            
+//         Branch current = parent;//?    this can go back one level if current = this branch          
+//         current.thickness = branch_ratio * reach;//top down - current.thickness is bottom part width
+//         while (current.thickness > current.parent.thickness) {
+//             current.parent.thickness = calcThickness(current.thickness);//function
+//             if (current.parent.parent != null) {
+//                 current = current.parent;//move up one level until root
+//             }
+//         }
+//     }
+// }
+
+
+// private float calcThickness(float thickness_) {
+//     return 1.02*(.1 + thickness_);
+// }
 
 </script>
