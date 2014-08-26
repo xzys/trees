@@ -91,24 +91,29 @@ function Branch(id) {
         .attr('x1', this.startx)
         .attr('y1', this.starty)
         .attr('x2', this.endx)
-        .attr('y2', this.endy);
+        .attr('y2', this.endy)
+        .attr('stroke-width', this.thickness);
 
   }
 }
 
 function Tree() {
     this.branches = [];
-    // this.extend_ratio = 0;
-    // this.split_ratio = 1;
+    // this.extend_ratio = 0.5;
+    // this.split_ratio = 0.5;
     
     this.extend_ratio = 0.05;
     this.split_ratio = 0.02;
+
     this.angle_variance = 0.3;
     this.branch_split = 0.3;
     this.branch_grow = 0.2;
 
     this.blength_base = 20;
     this.blength_variance = 5;
+    this.trunk_thickness = 1.03;
+
+    this.runcount = 0;
 
     // create root branch
     var b = new Branch(0);
@@ -123,7 +128,15 @@ function Tree() {
     };
 
     this.run = function() {
-      console.log('update');
+      // console.log('update');
+      this.runcount++;
+      // stop after 500
+      if(this.runcount > 500) {
+        clearInterval(loop);
+      }
+
+
+
       // keep new branches seperate until end
       var newbranches = [];
       
@@ -134,7 +147,7 @@ function Tree() {
         b.draw();
 
         // calculate thickness from the tips
-        if(!b.has_children) {
+        if(!b.has_children && b.parent != null) {
           this.caclulate_thickness(b);
         }
 
@@ -146,6 +159,7 @@ function Tree() {
           if(r < this.extend_ratio) {
             // console.log('extend');
             var nb = new Branch(this.branches.length + newbranches.length);
+            nb.parent = b;
             nb.startx = b.endx;
             nb.starty = b.endy;
             // bad style but shows similarity clearly
@@ -169,7 +183,7 @@ function Tree() {
             // console.log('split');
             // console.log(b);
             var nb1 = new Branch(this.branches.length + newbranches.length);
-
+            nb1.parent = b;
             nb1.startx = b.endx;
             nb1.starty = b.endy;
             nb1.angle = b.angle + this.branch_split + 
@@ -182,6 +196,7 @@ function Tree() {
             
             // gotta make sure newbranches.length is updated
             var nb2 = new Branch(this.branches.length + newbranches.length);
+            nb1.parent = b;
             nb2.startx = b.endx;
             nb2.starty = b.endy;
             nb2.angle = b.angle - this.branch_split + 
@@ -205,28 +220,44 @@ function Tree() {
     };
 
     // starts from the tips and recursive grows downward
-    this.caclulate_thickness = function(cur) {
-      var cb = cur.parent;
+    this.caclulate_thickness = function(cb) {
+      // console.log(cb);
+      cb.thickness = cb.length * 0.05;
 
+      while(cb.thickness > cb.parent.thickness) {
+        cb.parent.thickness = this.trunk_thickness * (0.1 + cb.thickness);
+        if(cb.parent.parent != null) {
+          // move up one level
+          cb = cb.parent;
+        } else {
+          break;
+        }
+      }
     }
 }
 
 var tree = new Tree();
-
 console.log(tree);
 
 
+
 // run this every interval
-window.setInterval(function(){
+var loop = window.setInterval(function(){
   tree.run();
 }, 100);
+
+window.onkeypress = function(){
+  console.log('hah');
+  clearInterval(loop);
+};
 
 
 // //set thcknesses from tips
 //     //count number of parents
 //     if (!children && !(this instanceof Leaf) &&  parent.parent != null) {            
 //         Branch current = parent;//?    this can go back one level if current = this branch          
-//         current.thickness = branch_ratio * reach;//top down - current.thickness is bottom part width
+//         current.thickness = branch_ratio * reach;
+//         // top down - current.thickness is bottom part width
 //         while (current.thickness > current.parent.thickness) {
 //             current.parent.thickness = calcThickness(current.thickness);//function
 //             if (current.parent.parent != null) {
